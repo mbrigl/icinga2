@@ -684,6 +684,56 @@ static int Main()
 }
 
 #ifdef _WIN32
+/* If path overrides are present in the current environment, persist them into the
+ * service's "Environment" registry value so that the SCM passes them to the service
+ * process (and thus to the daemon child process it spawns).
+ */
+static int SetServiceEnvironment(const std::string& serviceName)
+{
+	String dataPath = Utility::GetFromEnvironment("ICINGA2_DATA_PATH");
+	String installPath = Utility::GetFromEnvironment("ICINGA2_INSTALL_PATH");
+
+	if (dataPath.IsEmpty() && installPath.IsEmpty())
+		return 0;
+
+	/* REG_MULTI_SZ: NUL-terminated strings followed by a final NUL. */
+	std::string environment;
+
+	if (!dataPath.IsEmpty()) {
+		environment += "ICINGA2_DATA_PATH=" + std::string(dataPath.CStr());
+		environment += '\0';
+	}
+
+	if (!installPath.IsEmpty()) {
+		environment += "ICINGA2_INSTALL_PATH=" + std::string(installPath.CStr());
+		environment += '\0';
+	}
+
+	environment += '\0';
+
+	HKEY hKey;
+	std::string keyPath = "SYSTEM\\CurrentControlSet\\Services\\" + serviceName;
+
+	LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, keyPath.c_str(), 0, KEY_SET_VALUE, &hKey);
+
+	if (res != ERROR_SUCCESS) {
+		printf("RegOpenKeyEx failed (%ld)\n", res);
+		return 1;
+	}
+
+	res = RegSetValueEx(hKey, "Environment", 0, REG_MULTI_SZ,
+		reinterpret_cast<const BYTE *>(environment.data()), static_cast<DWORD>(environment.size()));
+
+	RegCloseKey(hKey);
+
+	if (res != ERROR_SUCCESS) {
+		printf("RegSetValueEx failed (%ld)\n", res);
+		return 1;
+	}
+
+	return 0;
+}
+
 static int SetupService(bool install, int argc, char **argv)
 {
 	SC_HANDLE schSCManager = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
@@ -710,15 +760,22 @@ static int SetupService(bool install, int argc, char **argv)
 	}
 	initf.close();
 
+	std::string serviceName = "icinga2";
+
 	for (int i = 0; i < argc; i++) {
 		if (!strcmp(argv[i], "--scm-user") && i + 1 < argc) {
 			scmUser = argv[i + 1];
+			i++;
+		} else if (!strcmp(argv[i], "--scm-name") && i + 1 < argc) {
+			serviceName = argv[i + 1];
 			i++;
 		} else
 			szArgs += " " + Utility::EscapeShellArg(argv[i]);
 	}
 
-	SC_HANDLE schService = OpenService(schSCManager, "icinga2", SERVICE_ALL_ACCESS);
+	std::string displayName = serviceName == "icinga2" ? "Icinga 2" : "Icinga 2 (" + serviceName + ")";
+
+	SC_HANDLE schService = OpenService(schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS);
 
 	if (schService) {
 		SERVICE_STATUS status;
@@ -743,8 +800,8 @@ static int SetupService(bool install, int argc, char **argv)
 	} else if (install) {
 		schService = CreateService(
 			schSCManager,
-			"icinga2",
-			"Icinga 2",
+			serviceName.c_str(),
+			displayName.c_str(),
 			SERVICE_ALL_ACCESS,
 			SERVICE_WIN32_OWN_PROCESS,
 			SERVICE_DEMAND_START,
@@ -788,6 +845,12 @@ static int SetupService(bool install, int argc, char **argv)
 		SERVICE_DESCRIPTION sdDescription = { "The Icinga 2 monitoring application" };
 		if(!ChangeServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, &sdDescription)) {
 			printf("ChangeServiceConfig2 failed (%d)\n", GetLastError());
+			CloseServiceHandle(schService);
+			CloseServiceHandle(schSCManager);
+			return 1;
+		}
+
+		if (SetServiceEnvironment(serviceName) != 0) {
 			CloseServiceHandle(schService);
 			CloseServiceHandle(schSCManager);
 			return 1;
@@ -851,8 +914,9 @@ static VOID WINAPI ServiceControlHandler(DWORD dwCtrl)
 
 static VOID WINAPI ServiceMain(DWORD argc, LPSTR *argv)
 {
+	/* The SCM passes the actual service name as argv[0]. */
 	l_SvcStatusHandle = RegisterServiceCtrlHandler(
-		"icinga2",
+		argv[0],
 		ServiceControlHandler);
 
 	l_SvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;

@@ -3299,7 +3299,64 @@ installation should not trigger a restart, but if you want to be completely sure
 C:> msiexec /i C:\Icinga2-v2.5.0-x86.msi /qn /norestart
 ```
 
+The MSI package supports the following optional properties:
+
+  Property              | Description
+  ----------------------|--------------------
+  `INSTALL_ROOT`        | **Optional.** Installation directory. Defaults to `C:\Program Files\ICINGA2`. Also selectable in the graphical installer.
+  `ICINGA_DATA_DIR`     | **Optional.** Data directory holding `etc` and `var`. Defaults to `C:\ProgramData\icinga2`.
+  `ICINGA_SERVICE_NAME` | **Optional.** Name of the Windows service. Defaults to `icinga2`.
+
+Example:
+
+```
+C:> msiexec /i C:\Icinga2-v2.5.0-x86.msi /qn /norestart INSTALL_ROOT="D:\Icinga2" ICINGA_DATA_DIR="D:\IcingaData" ICINGA_SERVICE_NAME=icinga2-b
+```
+
+Non-default values for `ICINGA_DATA_DIR` and `ICINGA_SERVICE_NAME` are persisted in the registry
+under `HKLM\SOFTWARE\Icinga GmbH\Icinga 2` and are re-used on upgrades and uninstalls, so they
+only have to be specified for the initial installation. A custom data directory is passed to the
+Icinga 2 service via the `ICINGA2_DATA_PATH` environment variable stored in the service's
+`Environment` registry value.
+
 Once the setup is completed you can use the `node setup` cli command too.
+
+### Multiple Agent Instances on the Same Windows Host <a id="distributed-monitoring-automation-windows-multiple-instances"></a>
+
+Windows Installer does not allow installing the same MSI package twice. To run a second
+agent instance on the same host, install the first instance via the MSI package as usual
+and set up the second instance manually from an elevated PowerShell prompt:
+
+```
+# Copy the installation directory of the first instance
+Copy-Item -Recurse 'C:\Program Files\ICINGA2' 'C:\Program Files\ICINGA2-B'
+
+# Path overrides for the second instance
+$env:ICINGA2_INSTALL_PATH = 'C:\Program Files\ICINGA2-B'
+$env:ICINGA2_DATA_PATH    = 'C:\ProgramData\icinga2-b'
+
+# Seed the data directory and set the ACLs (same as the MSI installer does)
+Copy-Item -Recurse 'C:\Program Files\ICINGA2-B\share\skel' $env:ICINGA2_DATA_PATH
+icacls "$env:ICINGA2_DATA_PATH" /grant '*S-1-5-20:(oi)(ci)m'
+icacls "$env:ICINGA2_DATA_PATH\etc" /inheritance:r /grant:r '*S-1-5-20:(oi)(ci)m' '*S-1-5-32-544:(oi)(ci)f'
+icacls "$env:ICINGA2_DATA_PATH\var" /inheritance:r /grant:r '*S-1-5-20:(oi)(ci)m' '*S-1-5-32-544:(oi)(ci)f'
+
+# Register and start the second service instance
+& 'C:\Program Files\ICINGA2-B\sbin\icinga2.exe' --scm-install --scm-name icinga2-b daemon
+```
+
+`--scm-install` stores the `ICINGA2_INSTALL_PATH` and `ICINGA2_DATA_PATH` environment variables
+in the service's `Environment` registry value, so the second instance keeps using its own
+directories. `--scm-uninstall --scm-name icinga2-b` removes the second service again.
+
+Note the following restrictions for the second instance:
+
+* The `ApiListener` object must use a different `bind_port` than the first instance (default `5665`),
+  and `NodeName` must differ if both instances connect to the same master.
+* Both instances log to the same Windows Event Log source `Icinga 2`.
+* MSI upgrades only update the first instance; re-copy the installation directory to
+  update the second one.
+* The graphical Icinga 2 setup wizard only manages the first (default) instance.
 
 ### Node Setup using CLI Parameters <a id="distributed-monitoring-automation-cli-node-setup"></a>
 

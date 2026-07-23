@@ -3,13 +3,20 @@
     <Property Id="ALLUSERS">1</Property>
     <Property Id="MSIRESTARTMANAGERCONTROL">Disable</Property>
 
+    <!-- Optional overrides for the data directory and the service name, e.g.
+         msiexec /i Icinga2.msi ICINGA_DATA_DIR="D:\IcingaData" ICINGA_SERVICE_NAME=icinga2-b -->
+    <Property Id="ICINGA_DATA_DIR" Secure="yes" />
+    <Property Id="ICINGA_SERVICE_NAME" Secure="yes" />
+
     <PropertyRef Id="WIX_IS_NETFRAMEWORK_46_OR_LATER_INSTALLED" />
     <Condition Message='This application requires .NET Framework 4.6 or higher. Please install the .NET Framework then run this installer again.'>
       <![CDATA[Installed OR WIX_IS_NETFRAMEWORK_46_OR_LATER_INSTALLED]]>
     </Condition>
 
     <CustomAction Id="XtraUpgradeNSIS" BinaryKey="icinga2_installer" ExeCommand="upgrade-nsis" Execute="deferred" Impersonate="no" />
-    <CustomAction Id="XtraInstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand="install" Execute="deferred" Impersonate="no" />
+    <!-- The trailing space inside the quotes keeps a trailing backslash in the property
+         value from escaping the closing quote; the installer trims it again. -->
+    <CustomAction Id="XtraInstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand='install "[ICINGA_DATA_DIR] " "[ICINGA_SERVICE_NAME] "' Execute="deferred" Impersonate="no" />
     <CustomAction Id="XtraUninstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand="uninstall" Execute="deferred" Impersonate="no" />
 
     <Binary Id="icinga2_installer" SourceFile="$<TARGET_FILE:icinga-installer>" />
