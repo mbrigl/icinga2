@@ -1,9 +1,6 @@
 name: Backbot
 on:
-  pull_request_target:
-    types:
-      - closed
-      - labeled
+  workflow_dispatch: {}
 
 # Disable all permissions for the GITHUB_TOKEN, as we are using a GitHub App token instead.
 permissions: {}

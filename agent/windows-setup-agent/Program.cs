@@ -52,6 +52,11 @@ namespace Icinga
 		{
 			get
 			{
+				string dataPath = Environment.GetEnvironmentVariable("ICINGA2_DATA_PATH");
+
+				if (!String.IsNullOrEmpty(dataPath))
+					return dataPath;
+
 				return Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\icinga2";
 			}
 		}

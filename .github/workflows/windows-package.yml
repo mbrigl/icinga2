@@ -1,21 +1,30 @@
-name: Windows
+name: Windows Package
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      bits:
+        description: 'Architecture to build'
+        type: choice
+        options:
+          - 'both'
+          - '64'
+          - '32'
+        default: 'both'
 
 concurrency:
-  group: windows-${{ github.event_name == 'push' && github.sha || github.ref }}
+  group: windows-package-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  windows:
-    name: Windows
+  windows-package:
+    name: Windows Package
 
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        bits: [32, 64]
+        bits: ${{ fromJSON(inputs.bits == 'both' && '[32, 64]' || format('[{0}]', inputs.bits)) }}
 
     runs-on: windows-2022
 
@@ -48,6 +57,13 @@ jobs:
           if ($LastExitCode -ne 0) { throw "Error during build" }
           & powershell.exe .\tools\win32\test.ps1
           if ($LastExitCode -ne 0) { throw "Error during test" }
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: icinga2-msi-${{ matrix.bits }}-bit
+          path: build/*.msi
+          if-no-files-found: error
 
       - name: Show Log Files
         if: ${{ always() }}

@@ -1919,6 +1919,10 @@ int Utility::MksTemp(char *tmpl)
 
 String Utility::GetIcingaInstallPath()
 {
+	String installPath = GetFromEnvironment("ICINGA2_INSTALL_PATH");
+	if (!installPath.IsEmpty())
+		return installPath;
+
 	char szProduct[39];
 
 	for (int i = 0; MsiEnumProducts(i, szProduct) == ERROR_SUCCESS; i++) {
@@ -1941,6 +1945,10 @@ String Utility::GetIcingaInstallPath()
 
 String Utility::GetIcingaDataPath()
 {
+	String dataPath = GetFromEnvironment("ICINGA2_DATA_PATH");
+	if (!dataPath.IsEmpty())
+		return dataPath;
+
 	char path[MAX_PATH];
 	if (!SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, path)))
 		return "";

@@ -1,7 +1,7 @@
 name: AUTHORS file
 
 on:
-  pull_request: { }
+  workflow_dispatch: {}
 
 jobs:
   authors-file:

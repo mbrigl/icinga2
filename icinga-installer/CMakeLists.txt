@@ -38,10 +38,31 @@ install(CODE "
   endif()"
 )
 
+# Deterministic GUIDs for the MSI instance transforms: the UpgradeCode has to stay
+# stable across versions (required for major upgrades) while the ProductCode has to
+# change with every version (required by Windows Installer).
+set(ICINGA2_GUID_NAMESPACE "52F2BEAA-4DF0-4C3E-ABDC-C0F61DE4DF8A")
+foreach(instance RANGE 2 5)
+  string(UUID ICINGA2_INSTANCE${instance}_PRODUCT_GUID
+    NAMESPACE ${ICINGA2_GUID_NAMESPACE}
+    NAME "icinga2-${ICINGA2_VERSION_SAFE}-instance${instance}-product"
+    TYPE SHA1 UPPER)
+  string(UUID ICINGA2_INSTANCE${instance}_UPGRADE_GUID
+    NAMESPACE ${ICINGA2_GUID_NAMESPACE}
+    NAME "icinga2-instance${instance}-upgrade"
+    TYPE SHA1 UPPER)
+endforeach()
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/icinga2.wixpatch.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/icinga2.wixpatch.in"
+  @ONLY
+)
+
 file(
   GENERATE
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/icinga2.wixpatch.$<CONFIG>"
-  INPUT "${CMAKE_CURRENT_SOURCE_DIR}/icinga2.wixpatch.cmake"
+  INPUT "${CMAKE_CURRENT_BINARY_DIR}/icinga2.wixpatch.in"
 )
 
 set(InstallPath "${CMAKE_INSTALL_SBINDIR}")
