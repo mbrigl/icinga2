@@ -3323,9 +3323,44 @@ Once the setup is completed you can use the `node setup` cli command too.
 
 ### Multiple Agent Instances on the Same Windows Host <a id="distributed-monitoring-automation-windows-multiple-instances"></a>
 
-Windows Installer does not allow installing the same MSI package twice. To run a second
-agent instance on the same host, install the first instance via the MSI package as usual
-and set up the second instance manually from an elevated PowerShell prompt:
+The MSI package contains instance transforms which allow installing up to five agent
+instances on the same host. Each instance is a separate Windows Installer product with
+its own ProductCode, shows up separately under "Programs and Features" and is upgraded
+and uninstalled independently.
+
+Install the first (default) instance as usual. Additional instances are installed from
+an elevated command prompt with `MSINEWINSTANCE` and one of the embedded transforms
+`:Instance2` to `:Instance5`. `INSTALL_ROOT` **must** be set to a distinct directory:
+
+```
+C:> msiexec /i Icinga2.msi MSINEWINSTANCE=1 TRANSFORMS=:Instance2 INSTALL_ROOT="C:\Program Files\ICINGA2-2" /qn /norestart
+```
+
+Instance `N` defaults to the service name `icinga2-N` and the data directory
+`C:\ProgramData\icinga2-N`; both can be overridden with the `ICINGA_SERVICE_NAME` and
+`ICINGA_DATA_DIR` properties. Settings are persisted per instance under
+`HKLM\SOFTWARE\Icinga GmbH\Icinga 2\Instances\<InstanceId>`.
+
+Upgrade an additional instance by applying the same transform to the new MSI package
+(without `MSINEWINSTANCE`):
+
+```
+C:> msiexec /i Icinga2-new.msi TRANSFORMS=:Instance2 /qn /norestart
+```
+
+Uninstall an additional instance via "Programs and Features" or by its ProductCode
+(`msiexec /x {ProductCode}`).
+
+Note: `icinga2.exe` of an additional instance locates its directories through the
+`ICINGA2_INSTALL_PATH` and `ICINGA2_DATA_PATH` environment variables stored in the
+service's `Environment` registry value. When using the CLI of such an instance
+interactively, set both variables in your shell first.
+
+#### Manual Second Instance Without the MSI <a id="distributed-monitoring-automation-windows-multiple-instances-manual"></a>
+
+Alternatively — for example when more than five instances are needed or the additional
+instance should not be managed by Windows Installer — a second instance can be set up
+manually from an elevated PowerShell prompt:
 
 ```
 # Copy the installation directory of the first instance
@@ -3349,13 +3384,15 @@ icacls "$env:ICINGA2_DATA_PATH\var" /inheritance:r /grant:r '*S-1-5-20:(oi)(ci)m
 in the service's `Environment` registry value, so the second instance keeps using its own
 directories. `--scm-uninstall --scm-name icinga2-b` removes the second service again.
 
-Note the following restrictions for the second instance:
+Unlike the MSI-based instances, a manually copied instance is unknown to Windows
+Installer: MSI upgrades only update the first instance, so re-copy the installation
+directory to update the manual one.
+
+Note the following restrictions for all additional instances (MSI-based or manual):
 
 * The `ApiListener` object must use a different `bind_port` than the first instance (default `5665`),
   and `NodeName` must differ if both instances connect to the same master.
-* Both instances log to the same Windows Event Log source `Icinga 2`.
-* MSI upgrades only update the first instance; re-copy the installation directory to
-  update the second one.
+* All instances log to the same Windows Event Log source `Icinga 2`.
 * The graphical Icinga 2 setup wizard only manages the first (default) instance.
 
 ### Node Setup using CLI Parameters <a id="distributed-monitoring-automation-cli-node-setup"></a>

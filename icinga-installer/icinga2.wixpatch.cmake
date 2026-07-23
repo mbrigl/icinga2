@@ -8,6 +8,19 @@
     <Property Id="ICINGA_DATA_DIR" Secure="yes" />
     <Property Id="ICINGA_SERVICE_NAME" Secure="yes" />
 
+    <!-- Instance transforms for installing multiple agent instances on the same host, e.g.
+         msiexec /i Icinga2.msi MSINEWINSTANCE=1 TRANSFORMS=:Instance2 INSTALL_ROOT="C:\Program Files\ICINGA2-2"
+         Each instance gets its own ProductCode/UpgradeCode so that it shows up, upgrades
+         and uninstalls as a separate product. The GUIDs are generated deterministically
+         at configure time (see CMakeLists.txt). -->
+    <Property Id="INSTANCEID" Value="Default" Secure="yes" />
+    <InstanceTransforms Property="INSTANCEID">
+      <Instance Id="Instance2" ProductCode="@ICINGA2_INSTANCE2_PRODUCT_GUID@" UpgradeCode="@ICINGA2_INSTANCE2_UPGRADE_GUID@" ProductName="Icinga 2 (Instance 2)" />
+      <Instance Id="Instance3" ProductCode="@ICINGA2_INSTANCE3_PRODUCT_GUID@" UpgradeCode="@ICINGA2_INSTANCE3_UPGRADE_GUID@" ProductName="Icinga 2 (Instance 3)" />
+      <Instance Id="Instance4" ProductCode="@ICINGA2_INSTANCE4_PRODUCT_GUID@" UpgradeCode="@ICINGA2_INSTANCE4_UPGRADE_GUID@" ProductName="Icinga 2 (Instance 4)" />
+      <Instance Id="Instance5" ProductCode="@ICINGA2_INSTANCE5_PRODUCT_GUID@" UpgradeCode="@ICINGA2_INSTANCE5_UPGRADE_GUID@" ProductName="Icinga 2 (Instance 5)" />
+    </InstanceTransforms>
+
     <PropertyRef Id="WIX_IS_NETFRAMEWORK_46_OR_LATER_INSTALLED" />
     <Condition Message='This application requires .NET Framework 4.6 or higher. Please install the .NET Framework then run this installer again.'>
       <![CDATA[Installed OR WIX_IS_NETFRAMEWORK_46_OR_LATER_INSTALLED]]>
@@ -16,8 +29,8 @@
     <CustomAction Id="XtraUpgradeNSIS" BinaryKey="icinga2_installer" ExeCommand="upgrade-nsis" Execute="deferred" Impersonate="no" />
     <!-- The trailing space inside the quotes keeps a trailing backslash in the property
          value from escaping the closing quote; the installer trims it again. -->
-    <CustomAction Id="XtraInstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand='install "[ICINGA_DATA_DIR] " "[ICINGA_SERVICE_NAME] "' Execute="deferred" Impersonate="no" />
-    <CustomAction Id="XtraUninstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand="uninstall" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="XtraInstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand='install "[ICINGA_DATA_DIR] " "[ICINGA_SERVICE_NAME] " "[INSTANCEID] "' Execute="deferred" Impersonate="no" />
+    <CustomAction Id="XtraUninstall" FileKey="CM_FP_sbin.icinga2_installer.exe" ExeCommand='uninstall "[INSTANCEID] "' Execute="deferred" Impersonate="no" />
 
     <Binary Id="icinga2_installer" SourceFile="$<TARGET_FILE:icinga-installer>" />
 

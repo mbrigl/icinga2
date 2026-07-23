@@ -89,15 +89,33 @@ static std::string GetIcingaDataPath(void)
 	return std::string(path) + "\\icinga2";
 }
 
-/* Settings passed as MSI properties are persisted here so that they are still
- * available during upgrades and uninstalls where MSI properties are not passed.
+/* Settings passed as MSI properties are persisted per instance so that they are
+ * still available during upgrades and uninstalls where MSI properties are not passed.
  */
-static const char *l_SettingsKeyPath = "SOFTWARE\\Icinga GmbH\\Icinga 2";
+static std::string SettingsKeyPath(const std::string& instanceId)
+{
+	return "SOFTWARE\\Icinga GmbH\\Icinga 2\\Instances\\" + instanceId;
+}
 
-static std::string ReadPersistedString(const char *name)
+/* Returns the numeric part of a WiX instance id ("Instance2" -> "2"). The default
+ * instance has no suffix.
+ */
+static std::string InstanceSuffix(const std::string& instanceId)
+{
+	if (instanceId.empty() || instanceId == "Default")
+		return "";
+
+	std::string suffix = instanceId;
+	if (suffix.size() > 8 && _strnicmp(suffix.c_str(), "Instance", 8) == 0)
+		suffix = suffix.substr(8);
+
+	return suffix;
+}
+
+static std::string ReadPersistedString(const std::string& instanceId, const char *name)
 {
 	HKEY hKey;
-	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, l_SettingsKeyPath, 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, SettingsKeyPath(instanceId).c_str(), 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
 		return "";
 
 	std::string result;
@@ -114,12 +132,14 @@ static std::string ReadPersistedString(const char *name)
 	return result;
 }
 
-static void PersistString(const char *name, const std::string& value)
+static void PersistString(const std::string& instanceId, const char *name, const std::string& value)
 {
+	std::string keyPath = SettingsKeyPath(instanceId);
+
 	HKEY hKey;
-	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, l_SettingsKeyPath, 0, nullptr, 0,
+	if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, keyPath.c_str(), 0, nullptr, 0,
 		KEY_SET_VALUE, nullptr, &hKey, nullptr) != ERROR_SUCCESS)
-		throw std::runtime_error(std::string("failed to create registry key ") + l_SettingsKeyPath);
+		throw std::runtime_error("failed to create registry key " + keyPath);
 
 	LONG res;
 	if (value.empty())
@@ -281,23 +301,29 @@ static int UpgradeNSIS(void)
 	return 0;
 }
 
-static int InstallIcinga(std::string dataDir, std::string serviceName)
+static int InstallIcinga(std::string dataDir, std::string serviceName, std::string instanceId)
 {
 	std::string installDir = GetIcingaInstallPath();
 	std::string skelDir = installDir + "\\share\\skel";
 
-	/* Resolution order: MSI property -> value persisted by a previous install -> built-in default. */
+	if (instanceId.empty())
+		instanceId = "Default";
+
+	/* Resolution order: MSI property -> value persisted by a previous install -> per-instance default. */
 	if (dataDir.empty())
-		dataDir = ReadPersistedString("DataDir");
+		dataDir = ReadPersistedString(instanceId, "DataDir");
 	if (serviceName.empty())
-		serviceName = ReadPersistedString("ServiceName");
+		serviceName = ReadPersistedString(instanceId, "ServiceName");
 
 	std::string defaultDataDir = GetIcingaDataPath();
+	std::string suffix = InstanceSuffix(instanceId);
+	std::string instanceDataDir = suffix.empty() ? defaultDataDir : defaultDataDir + "-" + suffix;
+	std::string instanceServiceName = suffix.empty() ? "icinga2" : "icinga2-" + suffix;
 
 	if (dataDir.empty())
-		dataDir = defaultDataDir;
+		dataDir = instanceDataDir;
 	if (serviceName.empty())
-		serviceName = "icinga2";
+		serviceName = instanceServiceName;
 
 	if (!PathExists(dataDir)) {
 		std::string sourceDir = skelDir + std::string(1, '\0');
@@ -363,11 +389,16 @@ static int InstallIcinga(std::string dataDir, std::string serviceName)
 		throw std::runtime_error("failed to set ACLs for " + dataDir + "\\var");
 	}
 
-	/* Make icinga2.exe use the custom data directory and persist it into the
-	 * service's environment (the child process inherits our environment).
+	/* Make icinga2.exe use the custom paths and persist them into the service's
+	 * environment (the child process inherits our environment). Secondary instances
+	 * always need ICINGA2_INSTALL_PATH as the runtime MSI product lookup only
+	 * matches the default instance's product name.
 	 */
 	if (dataDir != defaultDataDir)
 		SetEnvironmentVariable("ICINGA2_DATA_PATH", dataDir.c_str());
+
+	if (instanceId != "Default")
+		SetEnvironmentVariable("ICINGA2_INSTALL_PATH", installDir.c_str());
 
 	std::string scmArgs = "--scm-install";
 	if (serviceName != "icinga2")
@@ -376,25 +407,36 @@ static int InstallIcinga(std::string dataDir, std::string serviceName)
 
 	ExecuteIcingaCommand(scmArgs);
 
-	/* Persist non-default settings for upgrades and uninstalls; remove them when
-	 * back at the defaults so that a default install leaves no traces.
+	/* Persist explicitly overridden settings for upgrades and uninstalls; remove
+	 * them when back at the per-instance defaults, which are derived again there.
 	 */
-	PersistString("DataDir", dataDir != defaultDataDir ? dataDir : "");
-	PersistString("ServiceName", serviceName != "icinga2" ? serviceName : "");
+	PersistString(instanceId, "DataDir", dataDir != instanceDataDir ? dataDir : "");
+	PersistString(instanceId, "ServiceName", serviceName != instanceServiceName ? serviceName : "");
 
 	return 0;
 }
 
-static int UninstallIcinga(void)
+static int UninstallIcinga(std::string instanceId)
 {
-	std::string dataDir = ReadPersistedString("DataDir");
-	std::string serviceName = ReadPersistedString("ServiceName");
+	if (instanceId.empty())
+		instanceId = "Default";
 
-	if (!dataDir.empty())
+	std::string dataDir = ReadPersistedString(instanceId, "DataDir");
+	std::string serviceName = ReadPersistedString(instanceId, "ServiceName");
+
+	std::string defaultDataDir = GetIcingaDataPath();
+	std::string suffix = InstanceSuffix(instanceId);
+
+	if (dataDir.empty() && !suffix.empty())
+		dataDir = defaultDataDir + "-" + suffix;
+	if (serviceName.empty() && !suffix.empty())
+		serviceName = "icinga2-" + suffix;
+
+	if (!dataDir.empty() && dataDir != defaultDataDir)
 		SetEnvironmentVariable("ICINGA2_DATA_PATH", dataDir.c_str());
 
 	std::string scmArgs = "--scm-uninstall";
-	if (!serviceName.empty())
+	if (!serviceName.empty() && serviceName != "icinga2")
 		scmArgs += " --scm-name " + serviceName;
 
 	ExecuteIcingaCommand(scmArgs);
@@ -425,9 +467,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	if (!args.empty() && args[0] == "install") {
 		std::string dataDir = args.size() > 1 ? TrimField(args[1]) : "";
 		std::string serviceName = args.size() > 2 ? TrimField(args[2]) : "";
-		rc = InstallIcinga(dataDir, serviceName);
+		std::string instanceId = args.size() > 3 ? TrimField(args[3]) : "";
+		rc = InstallIcinga(dataDir, serviceName, instanceId);
 	} else if (!args.empty() && args[0] == "uninstall") {
-		rc = UninstallIcinga();
+		std::string instanceId = args.size() > 1 ? TrimField(args[1]) : "";
+		rc = UninstallIcinga(instanceId);
 	} else if (!args.empty() && args[0] == "upgrade-nsis") {
 		rc = UpgradeNSIS();
 	} else {
