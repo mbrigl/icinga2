@@ -1,0 +1,35 @@
+{
+  "name": "NUC DevContainer",
+
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
+  ],
+
+  "shutdownAction": "stopContainer",
+
+  // Runs on the host before the container is created. Ensures the bind-mount source for the agent
+  // config exists, so Docker does not auto-create it as a root-owned directory (which breaks
+  // credential writes inside the container).
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude",
+
+  "customizations": {
+    // VS Code extensions installed inside the container
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-vscode-remote.remote-containers"
+      ]
+    }
+  },
+
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}
