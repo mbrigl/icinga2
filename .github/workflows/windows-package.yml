@@ -1,0 +1,75 @@
+name: Windows Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      bits:
+        description: 'Architecture to build'
+        type: choice
+        options:
+          - 'both'
+          - '64'
+          - '32'
+        default: 'both'
+
+concurrency:
+  group: windows-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-package:
+    name: Windows Package
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        bits: ${{ fromJSON(inputs.bits == 'both' && '[32, 64]' || format('[{0}]', inputs.bits)) }}
+
+    runs-on: windows-2022
+
+    env:
+      BITS: '${{ matrix.bits }}'
+      CMAKE_BUILD_TYPE: RelWithDebInfo
+
+    steps:
+      - name: Checkout HEAD
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build tools
+        run: |
+          Set-PSDebug -Trace 1
+          & .\doc\win-dev.ps1
+
+      - name: Turn on Problem Matcher
+        run: |
+          Write-Host "::add-matcher::.github/problem-matchers/msvc.json"
+
+      - name: Binary
+        run: |
+          Set-PSDebug -Trace 1
+          & .\tools\win32\load-vsenv.ps1
+          & powershell.exe .\tools\win32\configure.ps1
+          if ($LastExitCode -ne 0) { throw "Error during configure" }
+          & powershell.exe .\tools\win32\build.ps1
+          if ($LastExitCode -ne 0) { throw "Error during build" }
+          & powershell.exe .\tools\win32\test.ps1
+          if ($LastExitCode -ne 0) { throw "Error during test" }
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: icinga2-msi-${{ matrix.bits }}-bit
+          path: build/*.msi
+          if-no-files-found: error
+
+      - name: Show Log Files
+        if: ${{ always() }}
+        run: |
+          foreach ($file in Get-ChildItem -Recurse -Filter "*.log") {
+            Write-Host "::group::$($file.FullName)"
+            Get-Content $file.FullName
+            Write-Host "::endgroup::"
+          }
