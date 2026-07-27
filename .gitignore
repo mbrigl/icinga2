@@ -2,6 +2,7 @@
 .*
 
 # Except those related to git and vagrant
+!.devcontainer
 !.git*
 !.puppet*
 !.travis.yml
