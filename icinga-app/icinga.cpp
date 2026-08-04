@@ -698,7 +698,7 @@ static int SetupService(bool install, int argc, char **argv)
 			szArgs += " " + Utility::EscapeShellArg(argv[i]);
 	}
 
-	SC_HANDLE schService = OpenService(schSCManager, "icinga2", SERVICE_ALL_ACCESS);
+	SC_HANDLE schService = OpenService(schSCManager, WP_ICINGA_WINSERVICENAME, SERVICE_ALL_ACCESS);
 
 	if (schService) {
 		SERVICE_STATUS status;
@@ -723,8 +723,8 @@ static int SetupService(bool install, int argc, char **argv)
 	} else if (install) {
 		schService = CreateService(
 			schSCManager,
-			"icinga2",
-			"Icinga 2",
+			WP_ICINGA_WINSERVICENAME,
+			WP_ICINGA_APPLICATIONLONGNAME,
 			SERVICE_ALL_ACCESS,
 			SERVICE_WIN32_OWN_PROCESS,
 			SERVICE_DEMAND_START,
@@ -765,7 +765,12 @@ static int SetupService(bool install, int argc, char **argv)
 			return 1;
 		}
 
-		SERVICE_DESCRIPTION sdDescription = { "The Icinga 2 monitoring application" };
+		std::string  strServiceDescriptionText = std::string("The ");
+		strServiceDescriptionText.append(WP_ICINGA_APPLICATIONLONGNAME);
+		strServiceDescriptionText.append(" monitoring application");
+		LPSTR lpServiceDescriptionText = new char[strServiceDescriptionText.length()];
+		_tcscpy(lpServiceDescriptionText, strServiceDescriptionText.c_str());
+		SERVICE_DESCRIPTION sdDescription = { lpServiceDescriptionText };
 		if(!ChangeServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, &sdDescription)) {
 			printf("ChangeServiceConfig2 failed (%d)\n", GetLastError());
 			CloseServiceHandle(schService);

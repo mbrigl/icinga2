@@ -10,6 +10,7 @@
 #include <shlobj.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "config.h"
 
 static std::string GetIcingaInstallPath(void)
 {
@@ -85,7 +86,7 @@ static std::string GetIcingaDataPath(void)
 	char path[MAX_PATH];
 	if (!SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, path)))
 		throw std::runtime_error("SHGetFolderPath failed");
-	return std::string(path) + "\\icinga2";
+	return std::string(path) + WP_ICINGA_RELATIVEDATAPATH;
 }
 
 static void MkDir(const std::string& path)
@@ -112,7 +113,7 @@ static std::string GetNSISInstallPath(void)
 {
 	HKEY hKey;
 	//TODO: Change hardcoded key
-	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Icinga Development Team\\ICINGA2", 0,
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, WP_ICINGA_REGKEYPATH, 0,
 		KEY_QUERY_VALUE | KEY_WOW64_32KEY, &hKey) == ERROR_SUCCESS) {
 		BYTE pvData[MAX_PATH];
 		DWORD cbData = sizeof(pvData) - 1;
@@ -302,7 +303,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	} else if (strcmp(lpCmdLine, "upgrade-nsis") == 0) {
 		rc = UpgradeNSIS();
 	} else {
-		MessageBox(nullptr, "This application should only be run by the MSI installer package.", "Icinga 2 Installer", MB_ICONWARNING);
+		MessageBox(nullptr, "This application should only be run by the MSI installer package.", (std::string(WP_ICINGA_APPLICATIONLONGNAME) + " Installer").c_str(), MB_ICONWARNING);
 		rc = 1;
 	}
 

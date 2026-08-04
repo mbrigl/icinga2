@@ -369,7 +369,7 @@ int NodeSetupCommand::SetupNode(const boost::program_options::variables_map& vm,
 		if (!vm.count("trustedcert")) {
 			Log(LogCritical, "cli")
 				<< "Please pass the trusted cert retrieved from the parent node (master or satellite)\n"
-				<< "(Hint: 'icinga2 pki save-cert --host <parenthost> --port <5665> --key local.key --cert local.crt --trustedcert trusted-parent.crt').";
+				<< "(Hint: 'icinga2 pki save-cert --host <parenthost> --port <5664> --key local.key --cert local.crt --trustedcert trusted-parent.crt').";
 			return 1;
 		}
 

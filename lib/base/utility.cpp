@@ -1949,7 +1949,7 @@ String Utility::GetIcingaInstallPath()
 		if (MsiGetProductInfo(szProduct, INSTALLPROPERTY_INSTALLEDPRODUCTNAME, szName, &cbName) != ERROR_SUCCESS)
 			continue;
 
-		if (strcmp(szName, "Icinga 2") != 0)
+		if (strcmp(szName, WP_ICINGA_APPLICATIONLONGNAME) != 0)
 			continue;
 
 		char szLocation[1024];
@@ -1966,7 +1966,7 @@ String Utility::GetIcingaDataPath()
 	char path[MAX_PATH];
 	if (!SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, path)))
 		return "";
-	return String(path) + "\\icinga2";
+	return String(path) + WP_ICINGA_RELATIVEDATAPATH;
 }
 
 #endif /* _WIN32 */
