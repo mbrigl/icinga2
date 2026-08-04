@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2021 Icinga GmbH <https://icinga.com>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "config.h"
+
 #ifdef _WIN32
 #include "base/windowseventloglogger.hpp"
 #include "base/windowseventloglogger-ti.cpp"
@@ -21,7 +23,7 @@ static HANDLE l_EventLog = nullptr;
 
 void WindowsEventLogLogger::StaticInitialize()
 {
-	l_EventLog = RegisterEventSourceA(nullptr, "Icinga 2");
+	l_EventLog = RegisterEventSourceA(nullptr, WP_ICINGA_APPLICATIONLONGNAME);
 }
 
 void WindowsEventLogLogger::StatsFunc(const Dictionary::Ptr& status, const Array::Ptr&)
