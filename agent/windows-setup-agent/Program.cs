@@ -35,7 +35,7 @@ namespace Icinga
 					if (NativeMethods.MsiGetProductInfo(szProduct.ToString(), "ProductName", szName, ref cbName) != 0)
 						continue;
 
-					if (szName.ToString() != "Icinga 2")
+					if (szName.ToString() != "Icinga 2 Cloud")
 						continue;
 
 					int cbLocation = 1024;
@@ -52,7 +52,7 @@ namespace Icinga
 		{
 			get
 			{
-				return Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\icinga2";
+				return Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\icinga2-cloud";
 			}
 		}
 
@@ -76,7 +76,7 @@ namespace Icinga
 
 		public static void FatalError(Form owner, string message)
 		{
-			MessageBox.Show(owner, message, "Icinga 2 Setup Wizard", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			MessageBox.Show(owner, message, "Icinga 2 Cloud Setup Wizard", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			Application.Exit();
 		}
 
@@ -92,7 +92,7 @@ namespace Icinga
 			string installDir = Program.Icinga2InstallDir;
 
 			if (installDir == "") {
-				FatalError(null, "Icinga 2 does not seem to be installed properly.");
+				FatalError(null, "Icinga 2 Cloud does not seem to be installed properly.");
 				return;
 			}
 
