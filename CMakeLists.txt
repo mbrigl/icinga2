@@ -133,6 +133,8 @@ string(REGEX REPLACE "^([0-9]+\\.[0-9]+\\.[0-9]+)[\\.]?[0-9]*" "\\1" CHOCO_VERSI
 message(STATUS "ICINGA2_VERSION_SAFE=${ICINGA2_VERSION_SAFE} CHOCO_VERSION_SHORT=${CHOCO_VERSION_SHORT}")
 
 if(WIN32)
+  add_compile_definitions(CLOUD_INSTANCE)
+
   set(Boost_USE_STATIC_LIBS ON)
   # Disabled for linking issues for newer Boost versions, they link against Windows SDKs
   #add_definitions(-DBOOST_ALL_NO_LIB)
@@ -499,16 +501,27 @@ if(ICINGA2_WITH_TESTS)
   add_subdirectory(test)
 endif()
 
-set(CPACK_PACKAGE_NAME "Icinga 2")
+#first line is istance 00, second one cloud instance
+#set(CPACK_PACKAGE_NAME "Icinga 2")
+set(CPACK_PACKAGE_NAME "Icinga 2 Cloud")
+
 set(CPACK_PACKAGE_VENDOR "Icinga GmbH")
 set(CPACK_PACKAGE_VERSION ${ICINGA2_VERSION_SAFE})
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "ICINGA2")
+
+#first line is istance 00, second one cloud instance
+#set(CPACK_PACKAGE_INSTALL_DIRECTORY "ICINGA2")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "ICINGA2-CLOUD")
+
 set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}/icinga-app\\\\icinga.ico")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt")
 
-set(CPACK_PACKAGE_EXECUTABLES "Icinga2SetupAgent;Icinga 2 Agent Wizard")
+set(CPACK_PACKAGE_EXECUTABLES "Icinga2SetupAgent;Icinga 2 Cloud Agent Wizard")
 set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/icinga-app\\\\icinga.ico")
-set(CPACK_WIX_UPGRADE_GUID "52F2BEAA-4DF0-4C3E-ABDC-C0F61DE4DF8A")
+
+#first line is istance 00, second one cloud instance
+#set(CPACK_WIX_UPGRADE_GUID "52F2BEAA-4DF0-4C3E-ABDC-C0F61DE4DF8A")
+set(CPACK_WIX_UPGRADE_GUID "6B115B49-0DA4-4B05-81ED-37FC7AABC01B")
+
 set(CPACK_WIX_UI_BANNER "${CMAKE_CURRENT_SOURCE_DIR}/icinga-installer/bannrbmp.bmp")
 set(CPACK_WIX_UI_DIALOG "${CMAKE_CURRENT_SOURCE_DIR}/icinga-installer/dlgbmp.bmp")
 set(CPACK_WIX_PATCH_FILE "${CMAKE_CURRENT_BINARY_DIR}/icinga-installer/icinga2.wixpatch.Debug")
