@@ -79,7 +79,7 @@ int PKIRequestCommand::Run(const boost::program_options::variables_map& vm, [[ma
 		return 1;
 	}
 
-	String port = "5665";
+	String port = "5664";
 	String ticket;
 
 	if (vm.count("port"))
